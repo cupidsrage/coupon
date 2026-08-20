@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0c3b2e" />
+<link rel="manifest" href="/manifest.json" />
+<title>Stackr — coupon stacking</title>
+<style>
+  :root {
+    --ink: #14201b;
+    --paper: #f7f4ec;
+    --green: #0c3b2e;
+    --green-2: #17624a;
+    --lime: #c8f169;
+    --clip: #e8532b;
+    --line: #d9d3c4;
+    --muted: #6b6357;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: var(--green);
+    color: var(--paper);
+    padding: 20px 18px 22px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .wordmark {
+    font-size: 26px; font-weight: 800; letter-spacing: -0.03em;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .wordmark .tag {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--lime);
+  }
+  .search {
+    margin-top: 14px; display: flex; gap: 8px;
+  }
+  .search input {
+    flex: 1; border: none; border-radius: 10px; padding: 13px 14px;
+    font: inherit; font-size: 16px; background: var(--paper); color: var(--ink);
+  }
+  .search button {
+    border: none; border-radius: 10px; padding: 0 16px; font: inherit;
+    font-weight: 700; background: var(--lime); color: var(--green); cursor: pointer;
+  }
+  .storebar { margin-top: 10px; font-size: 12px; color: var(--lime); }
+  .storebar select {
+    font: inherit; background: transparent; color: var(--paper);
+    border: 1px solid var(--green-2); border-radius: 6px; padding: 3px 6px;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 16px 14px 60px; }
+  .hint { color: var(--muted); font-size: 13px; text-align: center; padding: 40px 20px; }
+
+  /* Receipt-style card: each deal is a torn receipt slip. */
+  .slip {
+    background: #fff; border-radius: 4px; margin-bottom: 16px;
+    box-shadow: 0 1px 0 var(--line), 0 6px 16px rgba(20,32,27,0.06);
+    position: relative; overflow: hidden;
+  }
+  .slip::before {
+    content: ""; position: absolute; left: 0; top: 0; height: 100%; width: 5px;
+    background: repeating-linear-gradient(var(--clip) 0 8px, transparent 8px 14px);
+  }
+  .slip-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 14px 16px 8px 20px; gap: 12px;
+  }
+  .pname { font-weight: 700; font-size: 15px; line-height: 1.3; }
+  .pmeta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .price-final {
+    text-align: right; white-space: nowrap;
+  }
+  .price-final .oop { font-size: 22px; font-weight: 800; color: var(--green); }
+  .price-final .was {
+    font-size: 12px; color: var(--muted); text-decoration: line-through;
+  }
+  .badge {
+    display: inline-block; background: var(--lime); color: var(--green);
+    font-size: 11px; font-weight: 700; border-radius: 999px;
+    padding: 2px 9px; margin-top: 4px;
+  }
+  .steps {
+    border-top: 1px dashed var(--line); margin: 4px 16px 0 20px;
+    padding: 10px 0 14px;
+  }
+  .step {
+    display: flex; gap: 10px; font-size: 13px; padding: 4px 0;
+    align-items: baseline;
+  }
+  .step .n {
+    flex: none; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--green); color: #fff; font-size: 11px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .step .lbl { font-weight: 600; }
+  .step .det { color: var(--muted); }
+  .qtynote {
+    font-size: 12px; color: var(--clip); font-weight: 600;
+    margin: 2px 16px 10px 20px;
+  }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tab {
+    flex: 1; text-align: center; padding: 9px; border-radius: 8px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    background: #fff; color: var(--muted); border: 1px solid var(--line);
+  }
+  .tab.on { background: var(--green); color: #fff; border-color: var(--green); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">Stackr <span class="tag">out-of-pocket, exactly</span></div>
+  <div class="search">
+    <input id="q" placeholder="Search a product…" autocomplete="off" />
+    <button id="go">Find</button>
+  </div>
+  <div class="storebar">Store: <select id="store"></select></div>
+</header>
+<main>
+  <div class="tabs">
+    <div class="tab on" data-mode="deals">Best deals</div>
+    <div class="tab" data-mode="search">Search results</div>
+  </div>
+  <div id="list"><div class="hint">Loading best deals…</div></div>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let stores = [], currentStore = null, mode = "deals";
+
+async function loadStores() {
+  stores = await (await fetch("/api/stores")).json();
+  const sel = $("#store");
+  sel.innerHTML = stores.map((s) => `<option value="${s.id}">${s.name}</option>`).join("");
+  currentStore = stores[0]?.id;
+  sel.onchange = () => { currentStore = Number(sel.value); refresh(); };
+}
+
+function money(n) { return "$" + Number(n).toFixed(2); }
+
+function slip(r) {
+  const p = r.product, s = r.stack;
+  const shelf = p.price, oop = s.unitPrice;
+  const saved = shelf - oop;
+  const pct = shelf > 0 ? Math.round((saved / shelf) * 100) : 0;
+  const steps = s.steps.map((st, i) => `
+    <div class="step">
+      <span class="n">${i + 1}</span>
+      <span><span class="lbl">${st.label}.</span> <span class="det">${st.detail}</span></span>
+    </div>`).join("");
+  const qty = s.minQty > 1
+    ? `<div class="qtynote">Buy ${s.minQty} to unlock this price (per-unit shown).</div>` : "";
+  const badge = saved > 0 ? `<span class="badge">Save ${money(saved)} · ${pct}%</span>` : "";
+  return `
+  <div class="slip">
+    <div class="slip-head">
+      <div>
+        <div class="pname">${p.name}</div>
+        <div class="pmeta">${p.brand || ""}${p.size ? " · " + p.size : ""}</div>
+        ${badge}
+      </div>
+      <div class="price-final">
+        <div class="oop">${money(oop)}</div>
+        ${saved > 0 ? `<div class="was">${money(shelf)}</div>` : ""}
+      </div>
+    </div>
+    ${qty}
+    <div class="steps">${steps}</div>
+  </div>`;
+}
+
+function render(data) {
+  const list = $("#list");
+  if (!data.results?.length) {
+    list.innerHTML = `<div class="hint">No stackable deals found. Try another search.</div>`;
+    return;
+  }
+  list.innerHTML = data.results.map(slip).join("");
+}
+
+async function refresh() {
+  const list = $("#list");
+  list.innerHTML = `<div class="hint">Working out the math…</div>`;
+  if (mode === "deals") {
+    render(await (await fetch(`/api/deals?store=${currentStore}`)).json());
+  } else {
+    const q = $("#q").value.trim();
+    render(await (await fetch(`/api/search?store=${currentStore}&q=${encodeURIComponent(q)}`)).json());
+  }
+}
+
+$("#go").onclick = () => { mode = "search"; setTab(); refresh(); };
+$("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#go").click(); });
+document.querySelectorAll(".tab").forEach((t) =>
+  t.onclick = () => { mode = t.dataset.mode; setTab(); refresh(); });
+function setTab() {
+  document.querySelectorAll(".tab").forEach((t) =>
+    t.classList.toggle("on", t.dataset.mode === mode));
+}
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+loadStores().then(refresh);
+</script>
+</body>
+</html>
