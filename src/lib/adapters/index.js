@@ -8,9 +8,19 @@ import kroger from "./kroger.js";
 import target from "./target.js";
 import walgreens from "./walgreens.js";
 import aggregator from "./aggregator.js";
+import { scraperAdapters } from "./stores.js";
 import { scrapersEnabled } from "./base.js";
 
-export const adapters = { kroger, target, walgreens, aggregator };
+// API/official adapters + the ScraperAPI-backed store scrapers. Scraper
+// adapters only appear as runnable when ENABLE_SCRAPERS is on AND a
+// SCRAPERAPI_KEY is set (each reports that itself via available()).
+export const adapters = {
+  kroger,
+  target,
+  walgreens,
+  aggregator,
+  ...(scrapersEnabled() ? scraperAdapters : {}),
+};
 
 export function adapterStatus() {
   return Object.values(adapters).map((a) => ({

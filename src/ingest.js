@@ -17,6 +17,14 @@ export const jobs = [
   { adapter: "target", opts: { storeId: process.env.TARGET_STORE_ID || "1375", terms: TERMS } },
   { adapter: "walgreens", opts: {} },
   { adapter: "aggregator", opts: {} },
+  // ScraperAPI-backed store scrapers (only run when ENABLE_SCRAPERS=1 and
+  // SCRAPERAPI_KEY is set; otherwise skipped with a reason).
+  { adapter: "walmart", opts: { terms: TERMS } },
+  { adapter: "target-scraper", opts: { terms: TERMS } },
+  { adapter: "walgreens-scraper", opts: { terms: TERMS } },
+  { adapter: "albertsons", opts: { terms: TERMS } },
+  { adapter: "publix", opts: { terms: TERMS } },
+  { adapter: "cvs", opts: { terms: TERMS } },
 ];
 
 // Run when invoked directly (node src/ingest.js).
