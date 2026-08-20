@@ -2,6 +2,8 @@ import { Router } from "express";
 import db from "../lib/db.js";
 import { searchProducts, couponsForProduct } from "../lib/match.js";
 import { bestStack } from "../lib/stack.js";
+import { adapterStatus, runIngest } from "../lib/adapters/index.js";
+import { jobs as ingestJobs } from "../ingest.js";
 
 const router = Router();
 
@@ -73,6 +75,21 @@ router.post("/coupons", (req, res) => {
       expires: c.expires ?? null,
     });
   res.json({ id: info.lastInsertRowid });
+});
+
+// Which sources are configured and runnable right now.
+router.get("/sources", (req, res) => {
+  res.json(adapterStatus());
+});
+
+// Trigger a refresh. Protected by INGEST_TOKEN so a public deploy can't be
+// hammered; set the token in Railway, pass ?token= or an x-ingest-token header.
+router.post("/ingest", async (req, res) => {
+  const need = process.env.INGEST_TOKEN;
+  const got = req.get("x-ingest-token") || req.query.token;
+  if (need && got !== need) return res.status(401).json({ error: "bad token" });
+  const results = await runIngest(ingestJobs);
+  res.json({ results });
 });
 
 function defaultStoreId() {

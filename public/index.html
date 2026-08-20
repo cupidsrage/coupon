@@ -55,6 +55,14 @@
     font: inherit; background: transparent; color: var(--paper);
     border: 1px solid var(--green-2); border-radius: 6px; padding: 3px 6px;
   }
+  .sources { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .src {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 3px 8px; border-radius: 999px; border: 1px solid var(--green-2);
+    display: flex; align-items: center; gap: 5px; color: var(--paper);
+  }
+  .src .dot { width: 6px; height: 6px; border-radius: 50%; background: #6b7f76; }
+  .src.on .dot { background: var(--lime); }
   main { max-width: 640px; margin: 0 auto; padding: 16px 14px 60px; }
   .hint { color: var(--muted); font-size: 13px; text-align: center; padding: 40px 20px; }
 
@@ -122,6 +130,7 @@
     <button id="go">Find</button>
   </div>
   <div class="storebar">Store: <select id="store"></select></div>
+  <div class="sources" id="sources"></div>
 </header>
 <main>
   <div class="tabs">
@@ -205,8 +214,18 @@ function setTab() {
     t.classList.toggle("on", t.dataset.mode === mode));
 }
 
+async function loadSources() {
+  try {
+    const list = await (await fetch("/api/sources")).json();
+    $("#sources").innerHTML = list.map((s) =>
+      `<span class="src ${s.available ? "on" : ""}" title="${s.reason || "ready"}">
+        <span class="dot"></span>${s.label}</span>`).join("");
+  } catch { /* non-fatal */ }
+}
+
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 loadStores().then(refresh);
+loadSources();
 </script>
 </body>
 </html>

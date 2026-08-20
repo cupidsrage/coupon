@@ -7,10 +7,11 @@
   "scripts": {
     "start": "node src/server.js",
     "seed": "node src/seed.js",
+    "ingest": "node src/ingest.js",
     "dev": "node --watch src/server.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
